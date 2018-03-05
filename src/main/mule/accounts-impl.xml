@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<ee:object-store-caching-strategy name="Caching_Strategy" doc:name="Caching Strategy" doc:id="a812dd57-0a35-4110-9306-b5f592282aa2" >
+		<ee:serializable-event-copy-strategy />
+		<os:private-object-store alias="Cache_Object_Store" entryTtl="120" persistent="false"/>
+	</ee:object-store-caching-strategy>
+	<flow name="get:\accounts-impl" doc:id="7ba248a3-c2dd-4ee9-b0c8-7e0ab0fcd133" >
+		<set-variable value="#[attributes.headers.accept]" doc:name="Set Variable" doc:id="3491608d-1cfc-444a-bdb8-38be83414e31" variableName="accept"/>
+		<ee:cache doc:name="Cache" doc:id="8aa26b55-140c-411a-9976-c1011195f42f" filterExpression="#[attributes.headers.'cache-control' != 'no-cache']" cachingStrategy-ref="Caching_Strategy">
+			<http:request method="GET"  doc:id="b654db76-8175-4e2c-b7b9-398a8834641f" path="/accounts" config-ref="HTTP_Request_configuration" doc:name="Request">
+				<repeatable-in-memory-stream />
+</http:request>
+			<ee:transform doc:name="Add metadata" doc:id="bea4ab56-58a9-4c5e-8bb8-0d9fe0f36d4f">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Metadata: {
+		Expires: (now() + |PT2M|) as String {format: "EEE, dd MMM yyyy HH:mm:ss z"}
+	},
+	Content: payload
+}]]></ee:set-payload>
+				</ee:message>
+				<ee:variables>
+				</ee:variables>
+			</ee:transform>
+			<scripting:execute doc:name="To non-consumable" doc:id="60200ba2-095c-4d66-8d2c-5ace41699a23" engine="Groovy">
+				<scripting:code >return payload.text</scripting:code>
+			</scripting:execute>
+		</ee:cache>
+		<ee:transform doc:name="Generate Response" doc:id="9ad28130-3fbd-4fa0-bed5-7303e483ce9e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.Content]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="outboundHeaders" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	Expires: payload.Metadata.Expires
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="XML Accepted" doc:id="3b42aba6-efbc-41b4-8b50-6099e50a9608" >
+			<when expression="#[vars.accept=='application/xml']">
+				<ee:transform doc:name="Transform to XML Message" doc:id="7fcf1a08-7dd4-4c06-b762-77594ec8e1bc" >
+					<ee:message>
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+---
+accounts: {
+	account: payload as Array map ({
+		name: $.name,
+	    surname: $.surname,
+	    role: $.role,
+	    rank: $.rank,
+	    login: $.'_id'
+	})
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise>
+				<ee:transform doc:name="Transform to JSON Message" doc:id="b53a630e-86d0-442b-9e89-a9cb3a8e4c61" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload as Array map (value0, index0) -> {
+  name: value0.name,
+  surname: value0.surname,
+  role: value0.role,
+  rank: value0.rank as String,
+  login: value0."_id"
+})]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	
+</flow>
+	<flow name="get:\accounts\(login)-impl" doc:id="ccf1d7e8-f018-4cd8-adbd-4f56c37fe1a9" >
+		<set-variable value="#[attributes.headers.accept]" doc:name="Set Variable" doc:id="ab1c0012-82e8-46d2-8d7c-47703a492194" variableName="accept" />
+		<ee:cache doc:name="Cache" doc:id="074c26cc-b465-430b-8cc0-22be764bf991" >
+			<http:request method="GET" doc:name="Request" doc:id="551ade65-4f65-46f4-9e35-412ec5417353" config-ref="HTTP_Request_configuration" path="/accounts/{login}">
+			<http:uri-params><![CDATA[#[output applicaton/java
+---
+{
+	login : vars.login
+}]]]></http:uri-params>
+	
+</http:request>
+		</ee:cache>
+		<choice doc:name="XML Accepted" doc:id="e2780331-4bed-442b-88f3-1e6c8c2910f5" >
+			<when expression="#[vars.accept=='application/xml']" >
+				<ee:transform doc:name="Transform to XML Message" doc:id="c84d27df-d59b-48e1-8aaa-bd7b73539213" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+---
+account: {
+	name: payload.name,
+	surname: payload.surname,
+	role: payload.role,
+	rank: payload.rank,
+	login: payload.'_id'
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform to JSON Message" doc:id="45cab8d2-f20f-4dd4-9c64-e529bcf8b838" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  name: payload.name,
+  surname: payload.surname,
+  role: payload.role,
+  rank: payload.rank,
+  login: payload."_id"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="accounts-implFlow" doc:id="eb425343-8537-4744-9b1f-d499fdfda00d" >
+		<ee:cache doc:name="Cache" doc:id="6671c749-8aab-4424-bc51-e5f820a0224c" >
+			<set-payload value="#[payload]" doc:name="Set Payload" doc:id="6f72058a-1cd5-4048-9d7e-a7f3b4f15c9a" />
+			<http:request method="GET" doc:name="Request" doc:id="f1ce3ada-dfc4-49f8-b583-2809dc6dded4" config-ref="HTTP_Request_configuration" path="/ddd"/>
+			<ee:transform doc:name="Transform Message" doc:id="eca29a2c-2930-4971-b857-fa9ed310fee4" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+		</ee:cache>
+	</flow>
+
+</mule>

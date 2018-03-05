@@ -1,0 +1,74 @@
+#%RAML 1.0
+baseUri: https://mocksvc.mulesoft.com/mocks/15aad055-ecd8-426b-b2fd-54513f0ebfec # 
+version: v1
+title: accounts-service
+
+types:
+  account:
+    type: object
+    properties: 
+      login:
+      name:
+      surname:
+      role:
+      email?:
+      rank:
+        type: integer
+        default: 0
+
+/accounts:
+  get:
+    queryParameters: 
+      surname?:
+      role?:
+      rank?:
+        type: integer
+    responses: 
+      200:
+        body:
+          application/json:
+            type: array
+            items: 
+              type: account
+            example: |
+              [
+                {
+                  "login": "PBO",
+                  "name": "P",
+                  "surname": "BO",
+                  "role": "ADMIN",
+                  "rank": 150
+                },
+                {
+                  "login": "ADO",
+                  "name": "A",
+                  "surname": "DO",
+                  "role": "USR",
+                  "email": "ADO@mail.com",
+                  "rank": 52
+                }
+                ]
+          application/xml:
+            type: array
+            items:
+              type: account
+      415:
+        description: Unsupported Media Type
+  /{login}: 
+    get:
+      responses: 
+        200:
+          body: 
+            application/json:
+              type: account
+              example: |
+                {
+                    "login": "PBO",
+                    "name": "P",
+                    "surname": "BO",
+                    "role": "ADMIN",
+                    "rank": 150
+                }
+            application/xml:
+              type: account
+
