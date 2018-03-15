@@ -32,9 +32,6 @@ output application/json
 				<ee:variables>
 				</ee:variables>
 			</ee:transform>
-			<scripting:execute doc:name="To non-consumable" doc:id="60200ba2-095c-4d66-8d2c-5ace41699a23" engine="Groovy">
-				<scripting:code >return payload.text</scripting:code>
-			</scripting:execute>
 		</ee:cache>
 		<ee:transform doc:name="Generate Response" doc:id="9ad28130-3fbd-4fa0-bed5-7303e483ce9e" >
 			<ee:message >
