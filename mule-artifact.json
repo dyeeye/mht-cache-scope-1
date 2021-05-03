@@ -1,22 +1,3 @@
 {
-  "configs": [
-    "accounts-api.xml",
-    "accounts-impl.xml",
-    "global.xml"
-  ],
-  "secureProperties": [],
-  "redeploymentEnabled": true,
-  "name": "accounts-cached",
-  "minMuleVersion": "4.1.0",
-  "requiredProduct": "MULE_EE",
-  "classLoaderModelLoaderDescriptor": {
-    "id": "mule",
-    "attributes": {
-      "exportedResources": []
-    }
-  },
-  "bundleDescriptorLoader": {
-    "id": "mule",
-    "attributes": {}
-  }
+  "minMuleVersion": "4.3.0"
 }
