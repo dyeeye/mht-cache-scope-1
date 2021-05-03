@@ -1,22 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
-	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
-	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:mongo="http://www.mulesoft.org/schema/mule/mongo" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
 http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
-http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
-	<ee:object-store-caching-strategy name="Caching_Strategy" doc:name="Caching Strategy" doc:id="a812dd57-0a35-4110-9306-b5f592282aa2" >
-		<ee:serializable-event-copy-strategy />
-		<os:private-object-store alias="Cache_Object_Store" entryTtl="120" persistent="false"/>
-	</ee:object-store-caching-strategy>
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/mongo http://www.mulesoft.org/schema/mule/mongo/current/mule-mongo.xsd">
+
 	<flow name="get:\accounts-impl" doc:id="7ba248a3-c2dd-4ee9-b0c8-7e0ab0fcd133" >
-		<set-variable value="#[attributes.headers.accept]" doc:name="Set Variable" doc:id="3491608d-1cfc-444a-bdb8-38be83414e31" variableName="accept"/>
+		<set-variable doc:name="Accept header" doc:id="3491608d-1cfc-444a-bdb8-38be83414e31" variableName="accept" value='#[attributes.headers.accept]'/>
 		<ee:cache doc:name="Cache" doc:id="8aa26b55-140c-411a-9976-c1011195f42f" filterExpression="#[attributes.headers.'cache-control' != 'no-cache']" cachingStrategy-ref="Caching_Strategy">
-			<http:request method="GET"  doc:id="b654db76-8175-4e2c-b7b9-398a8834641f" path="/accounts" config-ref="HTTP_Request_configuration" doc:name="Request">
-				<repeatable-in-memory-stream />
-</http:request>
+			<mongo:find-documents doc:name="Get accounts" doc:id="9ef56791-bebc-4bbd-a33d-dc32130514e6" config-ref="MongoDB_Config" collectionName="accounts" fields=",">
+			</mongo:find-documents>
 			<ee:transform doc:name="Add metadata" doc:id="bea4ab56-58a9-4c5e-8bb8-0d9fe0f36d4f">
 				<ee:message>
 					<ee:set-payload><![CDATA[%dw 2.0
@@ -88,16 +85,19 @@ output application/json
 	
 </flow>
 	<flow name="get:\accounts\(login)-impl" doc:id="ccf1d7e8-f018-4cd8-adbd-4f56c37fe1a9" >
-		<set-variable value="#[attributes.headers.accept]" doc:name="Set Variable" doc:id="ab1c0012-82e8-46d2-8d7c-47703a492194" variableName="accept" />
+		<set-variable value="#[attributes.headers.accept]" doc:name="Accept header" doc:id="ab1c0012-82e8-46d2-8d7c-47703a492194" variableName="accept" />
 		<ee:cache doc:name="Cache" doc:id="074c26cc-b465-430b-8cc0-22be764bf991" >
-			<http:request method="GET" doc:name="Request" doc:id="551ade65-4f65-46f4-9e35-412ec5417353" config-ref="HTTP_Request_configuration" path="/accounts/{login}">
-			<http:uri-params><![CDATA[#[output applicaton/java
+			<mongo:find-documents doc:name="Get account by login" doc:id="65b93224-7d25-45f1-81eb-d758ef6ed50e" config-ref="MongoDB_Config" collectionName="accounts" fields=",">
+				<mongo:query ><![CDATA[#['{"_id": "$(attributes.uriParams.login)"}']]]></mongo:query>
+			</mongo:find-documents>
+			<ee:transform doc:name="Transform Message" doc:id="5fc55a78-ed44-4d8d-a803-32bd67428d7f" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
 ---
-{
-	login : vars.login
-}]]]></http:uri-params>
-	
-</http:request>
+payload]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
 		</ee:cache>
 		<choice doc:name="XML Accepted" doc:id="e2780331-4bed-442b-88f3-1e6c8c2910f5" >
 			<when expression="#[vars.accept=='application/xml']" >
@@ -107,11 +107,11 @@ output application/json
 output application/xml
 ---
 account: {
-	name: payload.name,
-	surname: payload.surname,
-	role: payload.role,
-	rank: payload.rank,
-	login: payload.'_id'
+	name: payload[0].name,
+	surname: payload[0].surname,
+	role: payload[0].role,
+	rank: payload[0].rank,
+	login: payload[0].'_id'
 }
 ]]></ee:set-payload>
 					</ee:message>
@@ -124,31 +124,16 @@ account: {
 output application/json
 ---
 {
-  name: payload.name,
-  surname: payload.surname,
-  role: payload.role,
-  rank: payload.rank,
-  login: payload."_id"
+  name: payload[0].name,
+  surname: payload[0].surname,
+  role: payload[0].role,
+  rank: payload[0].rank,
+  login: payload[0]."_id"
 }]]></ee:set-payload>
 					</ee:message>
 				</ee:transform>
 			</otherwise>
 		</choice>
-	</flow>
-	<flow name="accounts-implFlow" doc:id="eb425343-8537-4744-9b1f-d499fdfda00d" >
-		<ee:cache doc:name="Cache" doc:id="6671c749-8aab-4424-bc51-e5f820a0224c" >
-			<set-payload value="#[payload]" doc:name="Set Payload" doc:id="6f72058a-1cd5-4048-9d7e-a7f3b4f15c9a" />
-			<http:request method="GET" doc:name="Request" doc:id="f1ce3ada-dfc4-49f8-b583-2809dc6dded4" config-ref="HTTP_Request_configuration" path="/ddd"/>
-			<ee:transform doc:name="Transform Message" doc:id="eca29a2c-2930-4971-b857-fa9ed310fee4" >
-				<ee:message >
-					<ee:set-payload ><![CDATA[%dw 2.0
-output application/java
----
-{
-}]]></ee:set-payload>
-				</ee:message>
-			</ee:transform>
-		</ee:cache>
 	</flow>
 
 </mule>
